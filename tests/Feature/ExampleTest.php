@@ -1,19 +1,20 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Tests\Feature;
 
-// use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
 
-class ExampleTest extends TestCase
+final class ExampleTest extends TestCase
 {
-    /**
-     * A basic test example.
-     */
-    public function test_the_application_returns_a_successful_response(): void
+    public function test_health_endpoint_does_not_request_the_external_api(): void
     {
-        $response = $this->get('/');
+        Http::preventStrayRequests();
 
-        $response->assertStatus(200);
+        $this->get('/up')->assertOk();
+
+        Http::assertNothingSent();
     }
 }

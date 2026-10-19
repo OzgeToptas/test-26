@@ -42,7 +42,7 @@ final class RickAndMortyApiClient
         return Cache::remember(
             $cacheKey,
             now()->addMinutes(10),
-            function () use ($url, $query): array {
+            function () use ($url, $query, $endpoint): array {
                 try {
                     $response = Http::acceptJson()
                         ->connectTimeout(3)
@@ -73,7 +73,7 @@ final class RickAndMortyApiClient
                     $data = $response->json();
 
                     // Validate the JSON response structure.
-                    if (! is_array($data)) {
+                    if (! is_array($data) || ! $this->hasValidShape($endpoint, $data)) {
                         throw new RickAndMortyApiException(
                             'Invalid API response.',
                             502
@@ -104,5 +104,93 @@ final class RickAndMortyApiClient
                 }
             }
         );
+    }
+
+    /** Validate consumed fields before returning or caching upstream data. */
+    private function hasValidShape(string $endpoint, array $data): bool
+    {
+        [$resource] = explode('/', $endpoint);
+        $isCollection = ! str_contains($endpoint, '/');
+        $isBulk = str_contains($endpoint, ',');
+
+        if ($isCollection) {
+            if (! isset($data['info'], $data['results'])
+                || ! is_array($data['info'])
+                || ! is_array($data['results'])
+                || ! array_is_list($data['results'])) {
+                return false;
+            }
+
+            foreach (['count', 'pages'] as $field) {
+                if (! isset($data['info'][$field])
+                    || ! is_int($data['info'][$field])
+                    || $data['info'][$field] < 0) {
+                    return false;
+                }
+            }
+
+            $items = $data['results'];
+        } elseif ($isBulk) {
+            if (! array_is_list($data) || $data === []) {
+                return false;
+            }
+
+            $items = $data;
+        } else {
+            $items = [$data];
+        }
+
+        foreach ($items as $item) {
+            if (! is_array($item) || ! isset($item['id'])
+                || ! is_int($item['id']) || $item['id'] < 1) {
+                return false;
+            }
+
+            $fields = match ($resource) {
+                'character' => ['name', 'status', 'species', 'gender', 'image'],
+                'episode' => ['name', 'episode', 'air_date'],
+                'location' => ['name'],
+            };
+
+            foreach ($fields as $field) {
+                if (! isset($item[$field]) || ! is_string($item[$field])) {
+                    return false;
+                }
+            }
+
+            if ($resource === 'character') {
+                if (! filter_var($item['image'], FILTER_VALIDATE_URL)
+                    || ! in_array(parse_url($item['image'], PHP_URL_SCHEME), ['https', 'http'], true)) {
+                    return false;
+                }
+
+                if (! $isCollection) {
+                    foreach (['origin', 'location'] as $field) {
+                        if (! isset($item[$field]) || ! is_array($item[$field])
+                            || ! isset($item[$field]['name']) || ! is_string($item[$field]['name'])) {
+                            return false;
+                        }
+                    }
+
+                    if (array_key_exists('type', $item) && ! is_string($item['type'])) {
+                        return false;
+                    }
+
+                    if (! isset($item['episode']) || ! is_array($item['episode'])
+                        || ! array_is_list($item['episode'])) {
+                        return false;
+                    }
+
+                    foreach ($item['episode'] as $url) {
+                        if (! is_string($url)
+                            || ! preg_match('~^https?://[^/]+/api/episode/[1-9][0-9]*$~', $url)) {
+                            return false;
+                        }
+                    }
+                }
+            }
+        }
+
+        return true;
     }
 }

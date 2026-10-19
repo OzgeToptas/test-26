@@ -165,4 +165,15 @@ final class CharacterControllerTest extends TestCase
 
         Http::assertSentCount(1);
     }
+
+    public function test_malformed_upstream_response_shows_controlled_error(): void
+    {
+        Http::fake(['*' => Http::response(['unexpected' => 'data'])]);
+
+        $this->get('/')
+            ->assertStatus(503)
+            ->assertSee('Characters are temporarily unavailable.');
+
+        $this->get('/characters/1')->assertStatus(503);
+    }
 }
