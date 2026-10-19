@@ -21,34 +21,75 @@
             padding: 40px 20px;
         }
 
-        header { text-align: center; margin-bottom: 40px; }
-        h1 { font-size: 2.5rem; }
+        header { text-align: center; margin-bottom: 28px; }
+        h1 { font-size: clamp(1.75rem, 4vw, 2.5rem); margin: 0 0 12px; }
+        header p { margin: 0; color: #a9b8c9; line-height: 1.6; }
 
         .filters {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 12px;
-            margin-bottom: 30px;
+            display: grid;
+            grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr) minmax(0, 1.2fr) minmax(0, 1fr) auto auto;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 28px;
+            padding: 16px;
+            border: 1px solid #2d3d50;
+            border-radius: 14px;
+            background: #15202c;
         }
 
-        input, select, button {
-            padding: 12px;
+        .filters input, .filters select, .filters button, .filter-reset {
+            min-width: 0;
+            min-height: 44px;
+            padding: 10px 14px;
             border-radius: 8px;
-            border: 1px solid #475569;
+            border: 1px solid #42536a;
+            font: inherit;
             font-size: 14px;
+            line-height: 1.4;
         }
 
-        input, select {
-            background: #1e293b;
-            color: white;
+        .filters input, .filters select {
+            width: 100%;
+            background: #1c2939;
+            color: #f1f5f9;
+            color-scheme: dark;
         }
 
-        button {
-            background: #a3e635;
-            color: #111827;
-            border: none;
-            font-weight: bold;
+        .filters input::placeholder { color: #a9b8c9; opacity: 1; }
+        .filters input:hover, .filters select:hover { border-color: #71849c; }
+
+        .filters button, .filter-reset {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 600;
+            text-decoration: none;
             cursor: pointer;
+        }
+
+        .filters button {
+            background: #a3cf59;
+            border-color: #a3cf59;
+            color: #14200c;
+        }
+
+        .filters button:hover { background: #b5df70; border-color: #b5df70; }
+        .filter-reset { background: transparent; color: #dbe4ef; }
+        .filter-reset:hover { background: #26374b; border-color: #71849c; }
+
+        .filters input:focus-visible, .filters select:focus-visible,
+        .filters button:focus-visible, .filter-reset:focus-visible {
+            outline: 3px solid #b5df70;
+            outline-offset: 3px;
+        }
+
+        @media (max-width: 900px) {
+            .filters { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        }
+
+        @media (max-width: 480px) {
+            .container { padding: 28px 16px; }
+            .filters { grid-template-columns: minmax(0, 1fr); padding: 12px; }
         }
 
         .grid {
@@ -154,7 +195,7 @@
             </select>
 
             <button type="submit">Search</button>
-            <a href="{{ route('characters.index') }}" style="color: white; align-self: center;">
+            <a href="{{ route('characters.index') }}" class="filter-reset">
                 Reset
             </a>
         </form>
