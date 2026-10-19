@@ -3,7 +3,8 @@
 declare(strict_types=1);
 
 namespace App\Services;
-use RuntimeException;
+
+use App\Exceptions\RickAndMortyApiException;
 
 final readonly class CharacterService
 {
@@ -29,28 +30,26 @@ final readonly class CharacterService
                 'species' => $filters['species'] ?? null,
                 'gender' => $filters['gender'] ?? null,
             ],
-            static fn (mixed $value): bool =>
-                $value !== null && $value !== ''
+            static fn (mixed $value): bool => $value !== null && $value !== ''
         );
 
-       try {
-    $response = $this->api->get('character', $query);
-} catch (RuntimeException $exception) {
+        try {
+            $response = $this->api->get('character', $query);
+        } catch (RickAndMortyApiException $exception) {
+            if ($exception->statusCode() !== 404) {
+                throw $exception;
+            }
 
-    if ($exception->getCode() !== 404) {
-        throw $exception;
-    }
-
-    // The API returns 404 when no characters match the filters.
-    return [
-        'characters' => [],
-        'pagination' => [
-            'total' => 0,
-            'pages' => 0,
-            'current_page' => $page,
-        ],
-    ];
-}
+            // The API returns 404 when no characters match the filters.
+            return [
+                'characters' => [],
+                'pagination' => [
+                    'total' => 0,
+                    'pages' => 0,
+                    'current_page' => $page,
+                ],
+            ];
+        }
 
         return [
             'characters' => array_map(
@@ -73,7 +72,7 @@ final readonly class CharacterService
     }
 
     /**
-     * Retrieve a single character.
+     * Retrieve a single character and its episodes.
      */
     public function getCharacter(int $id): array
     {
@@ -85,10 +84,56 @@ final readonly class CharacterService
             'status' => $character['status'],
             'species' => $character['species'],
             'gender' => $character['gender'],
+            'type' => $character['type'] ?? '',
             'image' => $character['image'],
             'origin' => $character['origin']['name'] ?? 'Unknown',
             'location' => $character['location']['name'] ?? 'Unknown',
-            'episode_urls' => $character['episode'] ?? [],
+            'episodes' => $this->getEpisodes($character['episode'] ?? []),
         ];
+    }
+
+    /**
+     * Fetch episode details using the API's bulk endpoint.
+     *
+     * Avoids making a separate HTTP request for each episode.
+     */
+    private function getEpisodes(array $episodeUrls): array
+    {
+        if (empty($episodeUrls)) {
+            return [];
+        }
+
+        $episodeIds = [];
+
+        foreach ($episodeUrls as $url) {
+            if (preg_match('~/episode/([0-9]+)$~', $url, $matches)) {
+                $episodeIds[] = (int) $matches[1];
+            }
+        }
+
+        $episodeIds = array_values(array_unique($episodeIds));
+
+        if (empty($episodeIds)) {
+            return [];
+        }
+
+        $response = $this->api->get(
+            'episode/'.implode(',', $episodeIds)
+        );
+
+        // The API returns an object for one episode and an array for many.
+        $episodes = isset($response['id'])
+            ? [$response]
+            : $response;
+
+        return array_map(
+            static fn (array $episode): array => [
+                'id' => $episode['id'],
+                'name' => $episode['name'],
+                'episode' => $episode['episode'],
+                'air_date' => $episode['air_date'],
+            ],
+            $episodes
+        );
     }
 }

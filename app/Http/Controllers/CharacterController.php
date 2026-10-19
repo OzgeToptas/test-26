@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers;
 
+use App\Exceptions\RickAndMortyApiException;
 use App\Services\CharacterService;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Log;
 
 final class CharacterController extends Controller
@@ -15,7 +17,12 @@ final class CharacterController extends Controller
         private readonly CharacterService $characters
     ) {}
 
-    public function index(Request $request): View
+    /**
+     * Display a paginated list of characters.
+     *
+     * Supports searching and filtering.
+     */
+    public function index(Request $request): View|Response
     {
         $filters = $request->validate([
             'page' => ['sometimes', 'integer', 'min:1'],
@@ -38,12 +45,15 @@ final class CharacterController extends Controller
                 'filters' => $filters,
                 'error' => null,
             ]);
-        } catch (\Throwable $exception) {
+
+        } catch (RickAndMortyApiException $exception) {
             Log::error('Character listing failed', [
-                'exception' => $exception,
+                'status' => $exception->statusCode(),
+                'message' => $exception->getMessage(),
             ]);
 
-            return view('characters.index', [
+            // Return HTTP 503 when the external API is unavailable.
+            return response()->view('characters.index', [
                 'characters' => [],
                 'pagination' => [
                     'total' => 0,
@@ -52,10 +62,13 @@ final class CharacterController extends Controller
                 ],
                 'filters' => $filters,
                 'error' => 'Characters are temporarily unavailable. Please try again.',
-            ]);
+            ], 503);
         }
     }
 
+    /**
+     * Display an individual character and their episodes.
+     */
     public function show(int $id): View
     {
         try {
@@ -64,13 +77,25 @@ final class CharacterController extends Controller
             return view('characters.show', [
                 'character' => $character,
             ]);
-        } catch (\Throwable $exception) {
+
+        } catch (RickAndMortyApiException $exception) {
+
+            // Return HTTP 404 when the character does not exist.
+            if ($exception->statusCode() === 404) {
+                abort(404, 'Character not found.');
+            }
+
             Log::error('Character details failed', [
                 'id' => $id,
-                'exception' => $exception,
+                'status' => $exception->statusCode(),
+                'message' => $exception->getMessage(),
             ]);
 
-            abort(503, 'Character details are temporarily unavailable.');
+            // Return HTTP 503 for external API failures.
+            abort(
+                503,
+                'Character details are temporarily unavailable.'
+            );
         }
     }
 }

@@ -2,12 +2,12 @@
 
 return [
 
-   'rickandmorty' => [
-    'url' => env(
-        'RICK_AND_MORTY_API_URL',
-        'https://rickandmortyapi.com/api'
-    ),
-],
+    'rickandmorty' => [
+        'url' => env(
+            'RICK_AND_MORTY_API_URL',
+            'https://rickandmortyapi.com/api'
+        ),
+    ],
 
     'postmark' => [
         'key' => env('POSTMARK_API_KEY'),
